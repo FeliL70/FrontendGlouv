@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Esta app necesita acceso a Bluetooth para conectarse a dispositivos cercanos."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,11 +24,28 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.felil70.Glouv"
+      "package": "com.felil70.Glouv",
+      "permissions": [
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      [
+        "@config-plugins/react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "Glouv necesita acceso a Bluetooth para conectarse a dispositivos."
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "126233eb-144c-46de-a8a7-24cdd1e56aae"
@@ -33,3 +53,4 @@
     }
   }
 }
+
