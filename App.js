@@ -4,6 +4,8 @@ import MyTabs from './src/navigation/tabs';
 import AuthStack from './src/navigation/AuthStack';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 
+import { BluetoothProvider } from './src/context/BluetoothContext';
+
 function MainApp() {
   const { user } = useAuth();
 
@@ -17,7 +19,9 @@ function MainApp() {
 export default function App() {
   return (
     <AuthProvider>
+      <BluetoothProvider>
       <MainApp />
+      </BluetoothProvider>
     </AuthProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native'
 
@@ -7,67 +7,66 @@ import circuloYLogo from '../../assets/LogoCirculo.png'
 import BotonRojo from '../components/botonRojo'
 import Separador from '../components/separador';
 
+import { useBluetooth } from '../context/BluetoothContext';
+
 export default function conectarGlouvScreen() {
   
-    const [conectado, setConectado] = useState(false);
-    const navigation = useNavigation();
-    return (
-      
-      <View style={{backgroundColor: '#272727', flex: 1}}>
-         
-         
-         <Header titulo="Conectar Glouv"/>      
+  const { isConnected, connectToDevice, disconnectFromDevice } = useBluetooth();
+  const navigation = useNavigation();
 
-         <View style={styles.conectarGlouvScreen}>
-                 <View style={{ height: 25 }} />
-                 
-                 {!conectado ? (
-                  <View style={[styles.bordeImagen, {borderColor: 'white', marginBottom: 50}]} >
-                <Image source = {circuloYLogo} style={styles.imagenes}/>
-                </View>
-                   ) : (
-                    <View style={[styles.bordeImagen, {borderColor: '#C92828', marginBottom: 25}]} >
-                   <Image source = {circuloYLogo} style={styles.imagenes}/>
-                   </View>
-                   )}
-                 
-        {!conectado && (
+  return (
+    <View style={{backgroundColor: '#272727', flex: 1}}>
+       
+       <Header titulo="Conectar Glouv"/>      
+
+       <View style={styles.conectarGlouvScreen}>
+         <View style={{ height: 25 }} />
+         
+         {!isConnected ? (
+            <View style={[styles.bordeImagen, {borderColor: 'white', marginBottom: 50}]} >
+              <Image source={circuloYLogo} style={styles.imagenes}/>
+            </View>
+         ) : (
+            <View style={[styles.bordeImagen, {borderColor: '#C92828', marginBottom: 25}]} >
+              <Image source={circuloYLogo} style={styles.imagenes}/>
+            </View>
+         )}
+         
+        {!isConnected && (
           <BotonRojo
             texto="Conectar Glouv"
             blanco={false}
-            onPress={() => setConectado(true)}
+            onPress={connectToDevice}
           />
         )}
 
-        {conectado && (
+        {isConnected && (
           <BotonRojo
             texto="Conectado"
             blanco={true}
           />
         )}
 
-        
-        {conectado && (
+        {isConnected && (
           <BotonRojo
             texto="Desconectar Glouv"
             blanco={false}
-            onPress={() => setConectado(false)} 
+            onPress={disconnectFromDevice}
           />
         )}
 
-                  <Separador colorS="white" mB= {22.5} mT= {22.5} />
+        <Separador colorS="white" mB={22.5} mT={22.5} />
 
-                 <Text style={styles.text}>Presiona el botón para que permita activar la 
-                  conexión Bluetooth de los guantes. Al presionarlo,
-                  el sistema comienza a buscar dispositivos cercanos 
-                  para conectarse automáticamente.
-                  Una vez conectado podrás entrenar tranquilamente
-                  y los datos se registrarán en nuestra aplicación.</Text>
+        <Text style={styles.text}>
+          Presiona el botón para activar la conexión Bluetooth de los guantes.
+          El sistema buscará dispositivos cercanos automáticamente.
+          Una vez conectado podrás entrenar tranquilamente y los datos se registrarán en nuestra aplicación.
+        </Text>
 
-                 </View>
       </View>
-    );
-  }
+    </View>
+  );
+}
 
   const styles = StyleSheet.create({
     conectarGlouvScreen: {
