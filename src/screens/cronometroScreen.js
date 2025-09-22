@@ -7,17 +7,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 import BotonRojo from '../components/botonRojo';
 
+import { useBluetooth } from '../context/BluetoothContext';
+
 export default function CronometroScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { fuerza } = useBluetooth();
+  
   const {
     tiempoTotal,
     cantidadRounds,
     descanso,
     calentamiento,
-
-    pesoActual = 103,
-
   } = route.params;
 
   const [finalizado, setFinalizado] = useState(false);
@@ -131,7 +132,7 @@ useEffect(() => {
       <Text style={styles.titulo}>{`Round ${roundActual}`}</Text>
 
       <View style={styles.circulo}>
-       <Text style={styles.pesoTexto}>{pesoActual}KG</Text>
+       <Text style={styles.pesoTexto}>Peso actual: {fuerza !== null ? fuerza + " kg" : "Esperando datos..."}</Text>
       </View>
 
       <Text style={styles.tiempo}>{`${Math.floor(tiempoTranscurrido / 60)}:${(tiempoTranscurrido % 60).toString().padStart(2, '0')}`}</Text>
