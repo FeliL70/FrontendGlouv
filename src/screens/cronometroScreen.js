@@ -132,7 +132,7 @@ useEffect(() => {
       <Text style={styles.titulo}>{`Round ${roundActual}`}</Text>
 
       <View style={styles.circulo}>
-       <Text style={styles.pesoTexto}>Peso actual: {fuerza !== null ? fuerza + " kg" : "Esperando datos..."}</Text>
+       <Text style={styles.pesoTexto}>{fuerza !== null ? fuerza + " kg" : "Esperando datos..."}</Text>
       </View>
 
       <Text style={styles.tiempo}>{`${Math.floor(tiempoTranscurrido / 60)}:${(tiempoTranscurrido % 60).toString().padStart(2, '0')}`}</Text>
@@ -313,7 +313,8 @@ const styles = StyleSheet.create({
   marginBottom: 32,
 },
 pesoTexto: {
-  fontSize: 50,
+  fontSize: 22,
+  textAlign: 'center',
   color: 'white',
   fontWeight: 'bold',
 },
