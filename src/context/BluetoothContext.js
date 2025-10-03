@@ -15,8 +15,8 @@ export const BluetoothProvider = ({ children }) => {
 
   const { user } = useAuth();
 
-  const SERVICE_UUID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-  const CHARACTERISTIC_UUID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+  const SERVICE_UUID = "d1f1a340-2c47-11ee-be56-0242ac120002";
+  const CHARACTERISTIC_UUID = "d1f1a342-2c47-11ee-be56-0242ac120002";
 
   const guardarGolpe = async (valorFuerza) => {
     try {
