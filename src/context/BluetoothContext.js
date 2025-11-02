@@ -11,105 +11,98 @@ export const BluetoothProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [fuerza, setFuerza] = useState(null);
 
+  const { user } = useAuth(); // obtenemos el id del usuario logueado
   const DEVICE_NAME = "Glouv";
-
-  const { user } = useAuth();
-
   const SERVICE_UUID = "d1f1a340-2c47-11ee-be56-0242ac120002";
-  const CHARACTERISTIC_UUID = "d1f1a342-2c47-11ee-be56-0242ac120002";
+  const CHARACTERISTIC_UUID = "d1f1a341-2c47-11ee-be56-0242ac120002";
+  const PORCENTAJE_BRAZO = 0.049;
 
-  const guardarGolpe = async (valorFuerza) => {
+  // -------------------
+  // Funciones auxiliares
+  // -------------------
+  const fetchPerfil = async () => {
     try {
-      const response = await fetch(
-        `https://wealthy-albacore-eminently.ngrok-free.app/api/golpes`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id_usuarioEntrenamiento: user.id,
-            fuerza: valorFuerza,
-            id_guante: 1,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        console.log("Error guardando golpe:", response.status);
-      }
-    } catch (error) {
-      console.log("Error en guardarGolpe:", error);
-    }
-  };
-
-  const startNotifications = async (connectedDevice) => {
-    try {
-      connectedDevice.monitorCharacteristicForService(
-        SERVICE_UUID,
-        CHARACTERISTIC_UUID,
-        (error, characteristic) => {
-          if (error) {
-            console.log("Error en monitorCharacteristic:", error);
-            return;
-          }
-
-          if (characteristic?.value) {
-            const decoded = Buffer.from(
-              characteristic.value,
-              "base64"
-            ).toString("utf-8");
-
-            const valor = parseInt(decoded.trim(), 10);
-
-            if (!isNaN(valor)) {
-              console.log("Dato recibido:", valor);
-              setFuerza(valor);
-              guardarGolpe(valor);
-            }
-          }
-        }
-      );
+      const resp = await fetch(`https://wealthy-albacore-eminently.ngrok-free.app/api/perfil?id=${user.id}`);
+      const data = await resp.json();
+      return data; // { peso, id_tipoDeCuerpo }
     } catch (err) {
-      console.log("Error iniciando notificaciones:", err);
+      console.log("Error obteniendo perfil:", err);
     }
   };
 
+  const fetchTipoCuerpo = async (idTipo) => {
+    try {
+      const resp = await fetch(`https://wealthy-albacore-eminently.ngrok-free.app/api/tipoDeCuerpo?id=${idTipo}`);
+      const data = await resp.json();
+      return data; // { mult }
+    } catch (err) {
+      console.log("Error obteniendo tipoDeCuerpo:", err);
+    }
+  };
+
+  // -------------------
+  // Lectura BLE + cálculo fuerza
+  // -------------------
+const startNotifications = async (connectedDevice, peso, mult) => {
+  connectedDevice.monitorCharacteristicForService(
+    SERVICE_UUID,
+    CHARACTERISTIC_UUID,
+    (error, characteristic) => {
+      if (error) {
+        console.log("Error en monitorCharacteristic:", error);
+        return;
+      }
+
+      if (characteristic?.value) {
+    try {
+  const buf = Buffer.from(characteristic.value, "base64");
+
+  // Leer float en little endian (4 bytes típicos de float en Arduino)
+  const aceleracion = buf.readFloatLE(0);
+
+  if (!isNaN(aceleracion)) {
+    const masaBrazo = peso * PORCENTAJE_BRAZO * mult;
+    const fuerzaCalculada =  Math.round(masaBrazo * aceleracion);
+    console.log("Aceleración:", aceleracion, "→ Fuerza:", fuerzaCalculada);
+    setFuerza(fuerzaCalculada);
+  } else {
+    console.log("Float inválido:", buf);
+  }
+} catch (e) {
+  console.log("Error procesando float:", e);
+}
+      }
+    }
+  );
+};
+
+
+  // -------------------
+  // Conexión BLE
+  // -------------------
   const connectToDevice = async () => {
     try {
       console.log("Escaneando dispositivos...");
-      manager.stopDeviceScan();
-
-      const scanTimeout = setTimeout(() => {
-        manager.stopDeviceScan();
-        console.log("No se encontró el dispositivo después de 15s");
-        alert(
-          "No se encontró el guante Glouv. Verifica que esté encendido y cerca."
-        );
-      }, 15000);
-
       manager.startDeviceScan(null, null, async (error, scannedDevice) => {
         if (error) {
           console.log("Error escaneando:", error);
-          clearTimeout(scanTimeout);
           return;
         }
-
-        console.log("Detectado:", scannedDevice?.name);
-
         if (scannedDevice?.name === DEVICE_NAME) {
-          console.log("Encontrado:", scannedDevice.name);
-
           manager.stopDeviceScan();
-          clearTimeout(scanTimeout);
-
           try {
             const connectedDevice = await scannedDevice.connect();
             await connectedDevice.discoverAllServicesAndCharacteristics();
-
             setDevice(connectedDevice);
             setIsConnected(true);
             console.log("Conectado a", connectedDevice.name);
 
-            startNotifications(connectedDevice);
+            // obtenemos datos del usuario y tipo de cuerpo
+            const perfil = await fetchPerfil();
+            const tipo = await fetchTipoCuerpo(perfil.id_tipoDeCuerpo);
+
+            // arrancamos la lectura BLE
+            startNotifications(connectedDevice, perfil.peso, tipo.mult);
           } catch (connectError) {
             console.log("Error al conectar:", connectError);
           }

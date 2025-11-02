@@ -4,22 +4,18 @@ import { Audio } from 'expo-av';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
+import { Animated } from 'react-native';
 import BotonRojo from '../components/botonRojo';
-
 import { useBluetooth } from '../context/BluetoothContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function CronometroScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { fuerza } = useBluetooth();
-  
-  const {
-    tiempoTotal,
-    cantidadRounds,
-    descanso,
-    calentamiento,
-  } = route.params;
+  const { user } = useAuth();
+
+  const { id_entrenamiento, tiempoTotal, cantidadRounds, descanso, calentamiento } = route.params;
 
   const [finalizado, setFinalizado] = useState(false);
   const [esperandoInicio, setEsperandoInicio] = useState(true);
@@ -31,74 +27,209 @@ export default function CronometroScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const intervalRef = useRef(null);
 
+  // Nuevo: id del registro UsuarioEntrenamiento en la DB
+  const [idEntrenamiento, setIdEntrenamiento] = useState(null);
+
   const sonidoRef = useRef(null);
+  const [primerGolpe, setPrimerGolpe] = useState(false);
+  const animacionColor = useRef(new Animated.Value(0)).current;
+  const animacionPulso = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const cargarSonido = async () => {
-      const { sound } = await Audio.Sound.createAsync(
-        require('../../assets/sonidoCampa.mp3')
-      );
-      sonidoRef.current = sound;
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require('../../assets/sonidoCampa.mp3')
+        );
+        sonidoRef.current = sound;
+      } catch (err) {
+        console.error('Error cargando sonido:', err);
+      }
     };
-
     cargarSonido();
-
     return () => {
       if (sonidoRef.current) sonidoRef.current.unloadAsync();
+      clearInterval(intervalRef.current);
     };
   }, []);
 
-useEffect(() => {
-  if (esperandoInicio) return;
-
-  if (fase !== 'round' && tiempoFase > 0) {
-    const faseInterval = setInterval(() => {
-      setTiempoFase((prev) => prev - 1);
-    }, 1000);
-    return () => clearInterval(faseInterval);
-  }
-
-  if (fase !== 'round' && tiempoFase === 0) {
-    if (fase === 'calentamiento') {
-      setFase('round');
-      setCorriendo(true);
-    } else if (fase === 'espera') {
-      setFase('round');
-      setTiempoTranscurrido(0);
-      setCorriendo(true);
-    }
-  }
-
-  if (fase === 'round' && corriendo && tiempoTranscurrido < tiempoTotal) {
-    intervalRef.current = setInterval(() => {
-      setTiempoTranscurrido((prev) => prev + 1);
-    }, 1000);
-  } else if (fase === 'round' && corriendo && tiempoTranscurrido >= tiempoTotal) {
-    clearInterval(intervalRef.current);
-    reproducirSonido();
-
-    if (roundActual < cantidadRounds) {
-      setCorriendo(false);
-      setRoundActual((prev) => prev + 1);
-      setFase('espera');
-      setTiempoFase(descanso);
-    } else {
-      setCorriendo(false);
-      setFinalizado(true);
-    }
-  }
-
-  return () => clearInterval(intervalRef.current);
-}, [fase, tiempoTranscurrido, corriendo, tiempoFase, esperandoInicio]);
-
-
-  const reproducirSonido = async () => {
-    if (sonidoRef.current) {
-      await sonidoRef.current.replayAsync();
+  // cuando comienza el primer round, crear registro de UsuarioEntrenamiento en el backend
+  const crearUsuarioEntrenamiento = async () => {
+    try {
+      const res = await fetch(`https://wealthy-albacore-eminently.ngrok-free.app/api/usuarioEntrenamiento`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_usuario: user.id,
+          id_entrenamiento,
+          fecha: new Date().toISOString(),
+          tiempo: "00:00:00"
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json?.id) {
+        setIdEntrenamiento(json.id);
+      } else {
+        console.warn('No se pudo crear UsuarioEntrenamiento', json);
+      }
+    } catch (err) {
+      console.error('Error creando UsuarioEntrenamiento', err);
     }
   };
 
-  const progreso = tiempoTranscurrido / tiempoTotal;
+  const finalizarUsuarioEntrenamiento = async (id, tiempoFinalSegundos) => {
+  try {
+    if (!id) return;
+    const tiempoFormateado = new Date(tiempoFinalSegundos * 1000)
+      .toISOString()
+      .substring(11, 19); // "HH:MM:SS"
+
+    const res = await fetch(`https://wealthy-albacore-eminently.ngrok-free.app/api/usuarioEntrenamiento/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tiempo: tiempoFormateado }),
+    });
+
+    if (!res.ok) {
+      const json = await res.json();
+      console.warn('Error actualizando tiempo entrenamiento', json);
+    }
+  } catch (err) {
+    console.error('Error finalizando entrenamiento', err);
+  }
+};
+
+  // --- NUEVO: función que guarda un golpe en tu backend ---
+  const guardarGolpe = async (fuerzaValor, idUsuarioEntrenamiento, idGuante = null) => {
+    try {
+      if (!idUsuarioEntrenamiento) {
+        console.warn('guardarGolpe: falta idUsuarioEntrenamiento');
+        return;
+      }
+      // Ajustá la ruta si tu endpoint es diferente
+      const res = await fetch(`https://wealthy-albacore-eminently.ngrok-free.app/api/golpes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id_usuarioEntrenamiento: idUsuarioEntrenamiento,
+          fuerza: fuerzaValor,
+          id_guante: idGuante
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        console.warn('Error guardando golpe', json);
+      } else {
+        // opcional: podés hacer algo con la respuesta si querés
+        // console.log('Golpe guardado', json);
+      }
+    } catch (err) {
+      console.error('Error en guardarGolpe:', err);
+    }
+  };
+  // --------------------------------------------------------
+
+  // Reaccionar a fuerza -> guardar golpe SOLO si corriendo y idEntrenamiento
+  useEffect(() => {
+    if (!corriendo) return;
+    if (!idEntrenamiento) return;
+    if (fuerza == null) return;
+    if (fuerza <= 0) return;
+
+    // Guardar cada nuevo valor de fuerza directamente en la DB
+    guardarGolpe(fuerza, idEntrenamiento);
+
+    if (!primerGolpe) {
+      setPrimerGolpe(true);
+      Animated.timing(animacionColor, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    } else {
+      // pulso visual
+      Animated.sequence([
+        Animated.timing(animacionPulso, {
+          toValue: 1.1,
+          duration: 150,
+          useNativeDriver: false,
+        }),
+        Animated.timing(animacionPulso, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [fuerza, corriendo, idEntrenamiento]);
+
+  useEffect(() => {
+    if (esperandoInicio) return;
+
+    // al entrar a 'round' por primera vez, si no hay idEntrenamiento, crear uno
+    if (fase === 'round' && !idEntrenamiento) {
+      crearUsuarioEntrenamiento();
+    }
+
+    if (fase !== 'round' && tiempoFase > 0) {
+      const faseInterval = setInterval(() => {
+        setTiempoFase((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(faseInterval);
+    }
+
+    if (fase !== 'round' && tiempoFase === 0) {
+      if (fase === 'calentamiento') {
+        setFase('round');
+        setCorriendo(true);
+      } else if (fase === 'espera') {
+        setFase('round');
+        setTiempoTranscurrido(0);
+        setCorriendo(true);
+      }
+    }
+
+    if (fase === 'round' && corriendo && tiempoTranscurrido < tiempoTotal) {
+      // si ya había un intervalo, limpiarlo primero
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        setTiempoTranscurrido((prev) => prev + 1);
+      }, 1000);
+    } else if (fase === 'round' && corriendo && tiempoTranscurrido >= tiempoTotal) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      reproducirSonido();
+
+      // finalizar el entrenamiento actual (guardar tiempo)
+      if (idEntrenamiento) {
+        finalizarUsuarioEntrenamiento(idEntrenamiento, tiempoTranscurrido);
+      }
+
+      if (roundActual < cantidadRounds) {
+        setCorriendo(false);
+        setRoundActual((prev) => prev + 1);
+        setFase('espera');
+        setTiempoFase(descanso);
+        setIdEntrenamiento(null); // se puede crear uno nuevo al iniciar siguiente round
+      } else {
+        setCorriendo(false);
+        setFinalizado(true);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [fase, tiempoTranscurrido, corriendo, tiempoFase, esperandoInicio]);
+
+  const reproducirSonido = async () => {
+    if (sonidoRef.current) {
+      try {
+        await sonidoRef.current.replayAsync();
+      } catch (err) {
+        console.error('Error reproduciendo sonido', err);
+      }
+    }
+  };
 
   const manejarPausa = () => {
     setCorriendo(false);
@@ -110,8 +241,12 @@ useEffect(() => {
     setCorriendo(true);
   };
 
-  const abandonar = () => {
+  const abandonar = async () => {
     setModalVisible(false);
+    // Si abandonás y hay un entrenamiento creado, actualizalo con tiempo actual
+    if (idEntrenamiento) {
+      await finalizarUsuarioEntrenamiento(idEntrenamiento, tiempoTranscurrido);
+    }
     navigation.goBack();
   };
 
@@ -128,31 +263,72 @@ useEffect(() => {
   ))}
 </View>
 
+<Text style={styles.titulo}>{`Round ${roundActual}`}</Text>
 
-      <Text style={styles.titulo}>{`Round ${roundActual}`}</Text>
+<Animated.View
+  style={[
+    styles.circulo,
+    {
+      backgroundColor: animacionColor.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['white', '#C92828'],
+      }),
+      borderColor: animacionColor.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['#C92828', 'white'],
+      }),
+      transform: [{ scale: animacionPulso }],
+    },
+  ]}
+>
+  <Animated.Text
+    style={[
+      styles.pesoTexto,
+      {
+        color: animacionColor.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['black', 'white'], // 👈 negro con fondo blanco, blanco con fondo rojo
+        }),
+      },
+    ]}
+  >
+    {fuerza !== null && !isNaN(fuerza) && fuerza > 0
+  ? `${Math.round(fuerza)} kg`
+  : 'Esperando datos...'}
+  </Animated.Text>
+</Animated.View>
 
-      <View style={styles.circulo}>
-       <Text style={styles.pesoTexto}>{fuerza !== null ? fuerza + " kg" : "Esperando datos..."}</Text>
-      </View>
+<Text style={styles.tiempo}>
+  {`${Math.floor(tiempoTranscurrido / 60)}:${(tiempoTranscurrido % 60)
+    .toString()
+    .padStart(2, '0')}`}
+</Text>
 
-      <Text style={styles.tiempo}>{`${Math.floor(tiempoTranscurrido / 60)}:${(tiempoTranscurrido % 60).toString().padStart(2, '0')}`}</Text>
+<View style={styles.barraContainer}>
+  <View
+    style={[
+      styles.barraProgreso,
+      {
+        flex: 1 - tiempoTranscurrido / tiempoTotal,
+      },
+    ]}
+  />
+  <View
+    style={{
+      flex: tiempoTranscurrido / tiempoTotal,
+    }}
+  />
+</View>
 
-      <View style={styles.barraContainer}>
-        <View style={[styles.barraProgreso, { flex: progreso }]} />
-        <View style={{ flex: 1 - progreso }} />
-      </View>
+<View style={styles.controles}>
+  <TouchableOpacity onPress={manejarPausa}>
+    <Ionicons name="pause" size={48} color="white" />
+  </TouchableOpacity>
 
-      <View style={styles.controles}>
-
-        <TouchableOpacity onPress={manejarPausa}>
-          <Ionicons name="pause" size={48} color="white" />
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setTiempoTranscurrido(tiempoTotal)}>
-         <Ionicons name="play-skip-forward" size={48} color="white" />
-        </TouchableOpacity>
-
-      </View>
+  <TouchableOpacity onPress={() => setTiempoTranscurrido(tiempoTotal)}>
+    <Ionicons name="play-skip-forward" size={48} color="white" />
+  </TouchableOpacity>
+</View>
 
 <Modal visible={esperandoInicio || fase !== 'round'} transparent animationType="fade">
   <View style={styles.modalContainer}>
@@ -311,6 +487,7 @@ const styles = StyleSheet.create({
   justifyContent: 'center',
   alignItems: 'center',
   marginBottom: 32,
+  backgroundColor: 'white',
 },
 pesoTexto: {
   fontSize: 22,

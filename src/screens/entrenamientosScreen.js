@@ -43,7 +43,8 @@ useEffect(() => {
                     imagen: entreno.foto,
                     titulo: entreno.nombre,
                     Descripcion: entreno.descripcion,
-                    tiempoT: entreno.duracion
+                    tiempoT: entreno.duracion,
+                    entrenamientoId: entreno.id
                   })
                 }
                 />

@@ -9,7 +9,7 @@ export default function detalleEntrenamientoScreen() {
   const navigation = useNavigation();
 
   const route = useRoute();
-  const {imagen, titulo, Descripcion, tiempoT} = route.params;
+  const {imagen, titulo, Descripcion, tiempoT, entrenamientoId } = route.params;
 
   return (
     <View style={{backgroundColor: '#272727', flex: 1}}>
@@ -25,7 +25,9 @@ export default function detalleEntrenamientoScreen() {
                 tiempoTotal: tiempoT,
               cantidadRounds: 3,
             descanso: 90,
-            calentamiento: 90}
+            calentamiento: 90,
+           id_entrenamiento: entrenamientoId,
+          }
               )}/>
 
             </View>
