@@ -281,21 +281,29 @@ export default function CronometroScreen() {
     },
   ]}
 >
+  {/* GOLPES (YA LO TENÍAS) */}
   <Animated.Text
     style={[
       styles.pesoTexto,
       {
         color: animacionColor.interpolate({
           inputRange: [0, 1],
-          outputRange: ['black', 'white'], // 👈 negro con fondo blanco, blanco con fondo rojo
+          outputRange: ['black', 'white'],
         }),
       },
     ]}
   >
     {fuerza !== null && !isNaN(fuerza) && fuerza > 0
-  ? `${Math.round(fuerza)} kg`
-  : 'Esperando datos...'}
+      ? `${Math.round(fuerza)} kg`
+      : 'Esperando datos...'}
   </Animated.Text>
+
+  {/* INFO DEL USUARIO */}
+  <View style={{ marginTop: 10, alignItems: "center" }}>
+    <Text style={styles.infoUsuario}>{user?.nombre}</Text>
+    <Text style={styles.infoUsuario}>{user?.email}</Text>
+    <Text style={styles.infoUsuario}>{user?.pais}</Text>
+  </View>
 </Animated.View>
 
 <Text style={styles.tiempo}>
@@ -373,6 +381,7 @@ export default function CronometroScreen() {
             <View style={{
               flex: tiempoFase / (fase === 'calentamiento' ? calentamiento : descanso),
             }} />
+            
           </View>
 
           <BotonRojo
@@ -495,6 +504,15 @@ pesoTexto: {
   color: 'white',
   fontWeight: 'bold',
 },
+
+infoUsuario: {
+  fontSize: 12,
+  color: '#fff',
+  opacity: 0.9,
+  textAlign: 'center',
+  marginTop: -2,
+},
+
  
   modalContainer: {
   flex: 1,
